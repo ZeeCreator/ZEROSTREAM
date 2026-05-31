@@ -19,8 +19,8 @@ export default defineCachedEventHandler(async (event) => {
     link: item.link || null,
   })
   return {
-    popularToday: (d.populer_hari_ini || []).map(mapItem),
-    latest: (d.rilisan_terbaru || []).map(mapItem),
-    popularWeekly: (d.recommendation || []).map(mapItem),
+    popularToday: (d.populer_hari_ini || []).slice(0, 12).map(mapItem),
+    latest: (d.rilisan_terbaru || []).slice(0, 12).map(mapItem),
+    popularWeekly: (d.recommendation || []).slice(0, 12).map(mapItem),
   }
 }, { maxAge: 600 })

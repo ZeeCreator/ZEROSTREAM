@@ -33,6 +33,7 @@ export default defineCachedEventHandler(async (event) => {
         if (adultKeywords.some(k => lower.includes(k))) return false
         return true
       })
+      .slice(0, 18)
       .map(m => ({
       id: m.externalId,
       title: m.title,

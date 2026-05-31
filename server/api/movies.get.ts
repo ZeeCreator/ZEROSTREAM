@@ -5,7 +5,7 @@ export default defineCachedEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'Gagal mengambil data movie' })
   })
   return {
-    items: (res.data || []).map(m => ({
+    items: (res.data || []).slice(0, 18).map(m => ({
       id: m.externalId,
       title: m.title,
       slug: m.slug,

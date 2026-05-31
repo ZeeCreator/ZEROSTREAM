@@ -11,8 +11,9 @@
         <div class="lg:col-span-8 xl:col-span-9 space-y-6">
           <div class="relative aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
             <iframe
-              v-if="episode.currentEmbed"
-              :src="episode.currentEmbed"
+              v-if="selectedEmbed"
+              :key="selectedEmbed"
+              :src="selectedEmbed"
               class="w-full h-full"
               allowfullscreen
               allow="autoplay; encrypted-media"
@@ -23,6 +24,22 @@
                 <p class="font-body-lg">Tidak ada server tersedia</p>
               </div>
             </div>
+          </div>
+
+          <div v-if="episode.streamServers?.length" class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-on-surface-variant text-lg">cast</span>
+            <select
+              v-model="selectedServerIndex"
+              class="bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-2.5 text-label-md text-on-surface focus:outline-none focus:border-emerald-400/50 cursor-pointer min-w-[200px]"
+            >
+              <option
+                v-for="s in episode.streamServers"
+                :key="s.index"
+                :value="s.index"
+              >
+                {{ s.name }}
+              </option>
+            </select>
           </div>
 
           <div class="space-y-4">
@@ -166,6 +183,15 @@ const { data, pending } = useAsyncData<DonghuaEpisodeData>(
 )
 
 const episode = computed(() => data.value || null)
+
+const selectedServerIndex = ref(1)
+
+const selectedEmbed = computed(() => {
+  const ep = episode.value
+  if (!ep) return null
+  const server = ep.streamServers?.find((s: any) => s.index === selectedServerIndex.value)
+  return server?.embed || ep.currentEmbed || null
+})
 
 useHead({
   title: computed(() => episode.value ? `Nonton ${episode.value.title} - ZeroStream` : 'Nonton - ZeroStream')
