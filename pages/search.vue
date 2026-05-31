@@ -266,6 +266,8 @@ const adultItemLink = (item: any) => {
   return `/moviewatch/${item.slug}`
 }
 
+const queryCache = new Map<string, { results: ContentItem[], anime: AnimeV2Item[], donghua: DonghuaItem[], adult: any[] }>()
+
 const doSearch = useDebounceFn(async (q: string) => {
   if (!q.trim()) {
     results.value = []
@@ -274,72 +276,30 @@ const doSearch = useDebounceFn(async (q: string) => {
     pending.value = false
     return
   }
-  pending.value = true
-  try {
-    const [searchRes] = await Promise.all([
-      $fetch<{ items: ContentItem[] }>(`/api/search?q=${encodeURIComponent(q)}`, {
-        headers: { Accept: 'application/json' }
-      }),
-    ])
-    results.value = searchRes.items || []
-  } catch {
-    results.value = []
-  }
-  // anime search from errra API
-  try {
-    const res = await $fetch(`/api/anime/search?q=${encodeURIComponent(q)}`, {
-      headers: { Accept: 'application/json' }
-    })
-    animeResults.value = (res.data || []) as AnimeV2Item[]
-    if (adultUnlocked.value && res.adult?.length) {
-      const mapped = res.adult.map((a: any) => ({
-        id: a.slug,
-        title: a.title,
-        slug: a.slug,
-        poster: a.poster,
-        rating: a.rating || undefined,
-        quality: a.quality || undefined,
-        type: 'anime' as const,
-        year: a.year || undefined,
-        episodeCount: a.episode || undefined,
-        _src: 'anime' as const,
-        link: a.link || undefined,
-      }))
-      adultItems.value = [...adultItems.value, ...mapped]
+  const cached = queryCache.get(q)
+  if (cached) {
+    results.value = cached.results
+    animeResults.value = cached.anime
+    donghuaResults.value = cached.donghua
+    if (adultUnlocked.value && cached.adult.length) {
+      adultItems.value = cached.adult
     }
-  } catch {
-    animeResults.value = []
-  }
-  // donghua search from anichin API
-  try {
-    const res = await $fetch(`/api/donghua/search?q=${encodeURIComponent(q)}`, {
-      headers: { Accept: 'application/json' }
-    })
-    donghuaResults.value = (res?.data?.items || []) as DonghuaItem[]
-  } catch {
-    donghuaResults.value = []
-  }
-  pending.value = false
-}, 300)
-
-const doAdultSearch = useDebounceFn(async (q: string) => {
-  if (!adultUnlocked.value || !q.trim()) {
-    adultItems.value = []
-    adultPending.value = false
     return
   }
-  adultPending.value = true
-  try {
-    const [v1Res, animeRes] = await Promise.all([
-      $fetch<{ items: ContentItem[] }>(`/api/search?q=${encodeURIComponent(q)}&adult=true`, {
-        headers: { Accept: 'application/json' }
-      }).then(r => r.items || []),
-      $fetch(`/api/anime/search?q=${encodeURIComponent(q)}`, {
-        headers: { Accept: 'application/json' }
-      }),
-    ])
-    const v1 = v1Res.map(r => ({ ...r, _src: 'v1' as const }))
-    const v2 = ((animeRes as any)?.adult || []).map((a: any) => ({
+  pending.value = true
+  const [v1, anime, donghua] = await Promise.allSettled([
+    $fetch<{ items: ContentItem[] }>(`/api/search?q=${encodeURIComponent(q)}`),
+    $fetch<any>(`/api/anime/search?q=${encodeURIComponent(q)}`),
+    $fetch<any>(`/api/donghua/search?q=${encodeURIComponent(q)}`),
+  ])
+  const v1Items = v1.status === 'fulfilled' ? (v1.value.items || []) : []
+  const animeData = anime.status === 'fulfilled' ? anime.value : null
+  const animeItems = animeData ? (animeData.data || []) as AnimeV2Item[] : []
+  const donghuaItems = donghua.status === 'fulfilled' ? (donghua.value?.data?.items || []) as DonghuaItem[] : []
+
+  let adultMapped: any[] = []
+  if (adultUnlocked.value && animeData?.adult?.length) {
+    adultMapped = animeData.adult.map((a: any) => ({
       id: a.slug,
       title: a.title,
       slug: a.slug,
@@ -352,18 +312,68 @@ const doAdultSearch = useDebounceFn(async (q: string) => {
       _src: 'anime' as const,
       link: a.link || undefined,
     }))
-    const seen = new Set(adultItems.value.map(i => i.slug))
-    adultItems.value = [...adultItems.value, ...v1, ...v2].filter(i => {
-      if (seen.has(i.slug)) return false
-      seen.add(i.slug)
-      return true
-    })
-  } catch {
-    adultItems.value = []
-  } finally {
-    adultPending.value = false
+    adultItems.value = [...adultItems.value, ...adultMapped]
   }
-}, 300)
+
+  results.value = v1Items
+  animeResults.value = animeItems
+  donghuaResults.value = donghuaItems
+  pending.value = false
+
+  queryCache.set(q, { results: v1Items, anime: animeItems, donghua: donghuaItems, adult: adultMapped })
+  if (queryCache.size > 50) {
+    const first = queryCache.keys().next().value
+    if (first) queryCache.delete(first)
+  }
+}, 400)
+
+const adultCache = new Map<string, any[]>()
+
+const doAdultSearch = useDebounceFn(async (q: string) => {
+  if (!adultUnlocked.value || !q.trim()) {
+    adultItems.value = []
+    adultPending.value = false
+    return
+  }
+  const cached = adultCache.get(q)
+  if (cached) {
+    adultItems.value = cached
+    return
+  }
+  adultPending.value = true
+  const [v1Res, animeRes] = await Promise.allSettled([
+    $fetch<{ items: ContentItem[] }>(`/api/search?q=${encodeURIComponent(q)}&adult=true`),
+    $fetch(`/api/anime/search?q=${encodeURIComponent(q)}`),
+  ])
+  const v1 = v1Res.status === 'fulfilled' ? (v1Res.value.items || []).map(r => ({ ...r, _src: 'v1' as const })) : []
+  const v2 = animeRes.status === 'fulfilled' ? ((animeRes.value as any)?.adult || []).map((a: any) => ({
+    id: a.slug,
+    title: a.title,
+    slug: a.slug,
+    poster: a.poster,
+    rating: a.rating || undefined,
+    quality: a.quality || undefined,
+    type: 'anime' as const,
+    year: a.year || undefined,
+    episodeCount: a.episode || undefined,
+    _src: 'anime' as const,
+    link: a.link || undefined,
+  })) : []
+  const seen = new Set(adultItems.value.map(i => i.slug))
+  const merged = [...adultItems.value, ...v1, ...v2].filter(i => {
+    if (seen.has(i.slug)) return false
+    seen.add(i.slug)
+    return true
+  })
+  adultItems.value = merged
+  adultPending.value = false
+
+  adultCache.set(q, merged)
+  if (adultCache.size > 20) {
+    const first = adultCache.keys().next().value
+    if (first) adultCache.delete(first)
+  }
+}, 400)
 
 watch(searchInput, (val) => {
   const trimmed = val.trim()

@@ -1,4 +1,4 @@
-export default defineEventHandler(async (event) => {
+export default defineCachedEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const query = getQuery(event)
   const q = query.q || ''
@@ -36,4 +36,4 @@ export default defineEventHandler(async (event) => {
   } catch (err) {
     throw createError({ statusCode: 502, message: 'Gagal mencari anime' })
   }
-})
+}, { maxAge: 300 })

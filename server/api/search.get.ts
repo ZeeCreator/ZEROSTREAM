@@ -17,7 +17,7 @@ export interface SearchResponse {
   meta: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean }
 }
 
-export default defineEventHandler(async (event) => {
+export default defineCachedEventHandler(async (event) => {
   const query = getQuery(event)
   const q = String(query.q || '').trim()
   const adult = query.adult === 'true'
@@ -55,4 +55,4 @@ export default defineEventHandler(async (event) => {
   } catch (err) {
     throw createError({ statusCode: 502, message: 'Gagal mencari konten' })
   }
-})
+}, { maxAge: 300 })

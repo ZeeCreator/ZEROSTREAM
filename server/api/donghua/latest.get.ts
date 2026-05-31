@@ -1,4 +1,4 @@
-export default defineEventHandler(async (event) => {
+export default defineCachedEventHandler(async (event) => {
   const query = getQuery(event)
   const page = Number(query.page) || 1
   try {
@@ -36,4 +36,4 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 502, statusMessage: 'Gagal mengambil daftar donghua' })
     }
   }
-})
+}, { maxAge: 600 })

@@ -10,7 +10,8 @@ export default defineNuxtConfig({
   image: {
     domains: ['image.tmdb.org', 'placehold.co', 'api.dicebear.com', 'i0.wp.com', 'i1.wp.com', 'i2.wp.com', 'i3.wp.com', 'anichin.ro'],
     format: ['webp', 'avif'],
-    quality: 80,
+    quality: 60,
+    densities: [1],
     screens: {
       xs: 320,
       sm: 640,

@@ -77,7 +77,7 @@
           </h2>
           <div class="grid grid-cols-1 gap-3">
             <NuxtLink
-              v-for="ep in detail.episodes"
+              v-for="ep in visibleEpisodes"
               :key="ep.slug"
               :to="`/dongwatch/${ep.slug}`"
               class="flex items-center gap-4 glass-panel p-4 rounded-xl hover:bg-surface-container transition-all group"
@@ -94,6 +94,14 @@
               <span class="material-symbols-outlined text-on-surface-variant group-hover:text-emerald-400 transition-colors">play_arrow</span>
             </NuxtLink>
           </div>
+          <button
+            v-if="detail.episodes.length > INITIAL_EPISODE_LIMIT"
+            @click="showAllEpisodes = !showAllEpisodes"
+            class="mt-4 w-full py-3 rounded-xl border border-dashed border-emerald-400/30 text-emerald-400 font-label-md hover:bg-emerald-400/10 transition-all"
+          >
+            <template v-if="showAllEpisodes">Sembunyikan</template>
+            <template v-else>Tampilkan Semua ({{ detail.episodes.length }})</template>
+          </button>
         </section>
       </div>
 
@@ -186,16 +194,20 @@ interface DonghuaDetailWithEpisodes {
   episodes: EpisodeInfo[]
 }
 
-const route = useRoute()
-const slug = route.params.slug as string
+const INITIAL_EPISODE_LIMIT = 50
 
-const { data, pending } = useAsyncData('donghua-detail-' + slug, () =>
-  $fetch(`/api/donghua/detail/${slug}`)
+const route = useRoute()
+const slug = computed(() => route.params.slug as string)
+const showAllEpisodes = ref(false)
+
+const { data, pending } = useAsyncData(
+  () => `donghua-detail-${slug.value}`,
+  () => $fetch(`/api/donghua/detail/${slug.value}`)
     .then((res: any) => {
       const d = res?.data || res
       return {
         title: d.title || '',
-        slug: d.slug || slug,
+        slug: d.slug || slug.value,
         poster: d.poster || '',
         rating: d.rating || 0,
         status: d.status || '',
@@ -216,10 +228,15 @@ const { data, pending } = useAsyncData('donghua-detail-' + slug, () =>
         })),
       }
     }),
-  { default: () => null as DonghuaDetailWithEpisodes | null }
+  { default: () => null as DonghuaDetailWithEpisodes | null, lazy: true, watch: [slug] }
 )
 
 const detail = computed(() => data.value)
+const visibleEpisodes = computed(() => {
+  if (!detail.value?.episodes) return []
+  if (showAllEpisodes.value) return detail.value.episodes
+  return detail.value.episodes.slice(0, INITIAL_EPISODE_LIMIT)
+})
 const episodeStats = computed(() => detail.value?.episodes?.length)
 
 useHead({

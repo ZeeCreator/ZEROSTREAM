@@ -17,30 +17,28 @@ interface DrakorResponse {
   meta: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean }
 }
 
-export default defineEventHandler(async (event) => {
+export default defineCachedEventHandler(async (event) => {
   const query = getQuery(event)
   const page = query.page || 1
-  try {
-    const res = await $fetch<DrakorResponse>(`https://lk-21-apis.vercel.app/api/v1/search/?q=korea&page=${page}`)
-    return {
-      items: (res.data || [])
-        .filter((m: DrakorItemRaw) => {
-          if (!m.posterUrl || m.posterUrl.startsWith('data:')) return false
-          return true
-        })
-        .map((m: DrakorItemRaw) => ({
-          id: m.externalId,
-          title: m.title,
-          slug: m.slug,
-          poster: m.posterUrl,
-          rating: m.rating,
-          quality: m.quality || undefined,
-          type: m.type === 'tv' ? 'tv' as const : 'movie' as const,
-          episodeCount: m.episodeCount || undefined,
-        })),
-      meta: res.meta,
-    }
-  } catch (err) {
+  const res = await $fetch<DrakorResponse>(`https://lk-21-apis.vercel.app/api/v1/search/?q=korea&page=${page}`).catch(() => {
     throw createError({ statusCode: 502, message: 'Gagal mengambil data drakor' })
+  })
+  return {
+    items: (res.data || [])
+      .filter((m: DrakorItemRaw) => {
+        if (!m.posterUrl || m.posterUrl.startsWith('data:')) return false
+        return true
+      })
+      .map((m: DrakorItemRaw) => ({
+        id: m.externalId,
+        title: m.title,
+        slug: m.slug,
+        poster: m.posterUrl,
+        rating: m.rating,
+        quality: m.quality || undefined,
+        type: m.type === 'tv' ? 'tv' as const : 'movie' as const,
+        episodeCount: m.episodeCount || undefined,
+      })),
+    meta: res.meta,
   }
-})
+}, { maxAge: 600 })
