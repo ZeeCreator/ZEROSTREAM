@@ -1,4 +1,4 @@
-export default defineCachedEventHandler(async (event) => {
+export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const query = getQuery(event)
   const q = query.q || ''
@@ -10,4 +10,4 @@ export default defineCachedEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'Gagal mencari donghua' })
   })
   return res
-}, { maxAge: 300 })
+})
